@@ -1,7 +1,7 @@
 # Best Time Tracker
-Imports results from Hy-Tek meet manager and converts into a CSV using terrible ideas and misuse of PDFs.
+Imports results from Hy-Tek Team Stats Online and converts into a CSV through terrible misuse of PDFs.
 
-## Requirements:
+## Requirements
 Requires Pango installed for `weasyprint` library functionality.
 1. Install [MSYS2](https://www.msys2.org/#installation) with the default options.
 2. Execute this command in the MSYS shell: `pacman -S mingw-w64-x86_64-pango`
@@ -9,3 +9,6 @@ Requires Pango installed for `weasyprint` library functionality.
    - `pypdf`
    - `requests`
    - `weasyprint`
+
+## Notes
+Don't run this in a console with poor buffer flush habits - there's a lot of print output.
