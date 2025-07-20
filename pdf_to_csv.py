@@ -184,8 +184,14 @@ def durationToTime(time: str):
     return total
 
 def cleanUpCSV(swimmerInfo: list[list[str]], csvData : list[list[str]]):
+    csvData = []  # TODO: Remove initial CSV data, this is a temporary fix for accidentally using old information
+    
     # Ensure first row actually works
-    csvData[0] = ['Name','Div.','100IM','200IM','50FL','100FL','50BK','100BK','50BR','100BR','50FR','100FR']
+    if len(csvData) != 0:
+        csvData[0] = ['Name','Div.','100IM','200IM','50FL','100FL','50BK','100BK','50BR','100BR','50FR','100FR']
+    else:
+        csvData = [['Name','Div.','100IM','200IM','50FL','100FL','50BK','100BK','50BR','100BR','50FR','100FR']]
+    
     lengthOfRow = len(csvData[0])
     csvNames = [i[0] for i in csvData[1:]]
     
