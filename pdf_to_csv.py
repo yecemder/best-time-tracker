@@ -154,7 +154,7 @@ def sanitize_entries(times, swimmerlist):
             out.append(entry)
     return out
 
-def formatToDuration(time: str):
+def fixDurationFormatting(time: str):
     t = list(time)
     t.reverse()
     out = ['', '', ':', '', '', ':', '', '', '.', '', '']
@@ -228,7 +228,7 @@ def cleanUpCSV(swimmerInfo: list[list[str]], csvData : list[list[str]]):
             if row[i] == '' or row[i] == '00:00:00.00':  # Don't do anything to empty cells
                 row[i] = ''  # Remove zero-times
                 continue
-            row[i] = formatToDuration(row[i])  # Ensure duration formatting
+            row[i] = fixDurationFormatting(row[i])  # Ensure duration formatting
     
     return csvData
 
@@ -248,7 +248,7 @@ def writeEventToCSV(eventName : str, csvData : list[list[str]], times : list[lis
     for time in times:
         for row in csvData:
             if time[0] == row[0]:  # Found right name
-                formattedTime = formatToDuration(time[1])
+                formattedTime = fixDurationFormatting(time[1])
                 # Check a better time than current or if time is empty
                 if row[eventIndex] == '':
                     # print(f"Writing {formattedTime} to EMPTY cell of swimmer: {time[0]}, index {eventIndex} ({eventName})")
