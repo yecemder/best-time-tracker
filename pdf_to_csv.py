@@ -167,6 +167,20 @@ def formatToDuration(time: str):
         out[i] = t[i]
     return "".join(list(reversed(out)))
 
+def timeToDuration(time: float) -> str:
+    if not isinstance(time, (float, int)):
+        raise TypeError("time must be a float or int")
+    if time < 0:
+        raise Exception(f"Attempted to convert invalid time to duration: {time}")
+    if time == 0:
+        return "00:00:00.00"
+    hours = int(time // 3600)
+    time %= 3600
+    minutes = int(time // 60)
+    seconds = int(time % 60)
+    dd = round(round(time - int(time), 2)*100)
+    return f"{hours:02}:{minutes:02}:{seconds:02}.{dd:02}"
+
 def durationToTime(time: str): 
     # Assumes that the duration is formatted properly
     key = [36000, 3600, None, 600, 60, None, 10, 1, None, 0.1, 0.01]  # Value in seconds of each digit of duration
