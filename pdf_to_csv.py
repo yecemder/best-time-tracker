@@ -230,7 +230,7 @@ def cleanUpCSV(swimmerInfo: list[list[str]], csvData : list[list[str]]):
     
     return csvData
 
-def writeEventToCSV(eventName : str, csvData : list[list[str]], times : list[list[str]]):
+def writeEventToCSV(eventName : str, csvData : list[list[str]], times : list[list[str]], force_write: bool = False):
     global ignoreOtherMissingNamesFlag, new_times, updated_times
     
     # Find event index
@@ -252,7 +252,9 @@ def writeEventToCSV(eventName : str, csvData : list[list[str]], times : list[lis
                     # print(f"Writing {formattedTime} to EMPTY cell of swimmer: {time[0]}, index {eventIndex} ({eventName})")
                     row[eventIndex] = formattedTime
                     new_times += 1
-                elif durationToTime(formattedTime) < durationToTime(row[eventIndex]):
+                elif durationToTime(formattedTime) < durationToTime(row[eventIndex]) or (
+                    force_write and durationToTime(formattedTime) >= durationToTime(row[eventIndex])):  
+                    # Preventative measure for blank times
                     # print(f"Overwriting with {formattedTime} to {row[eventIndex]} swimmer: {time[0]}, index {eventIndex} ({eventName})")
                     row[eventIndex] = formattedTime
                     updated_times += 1
@@ -324,13 +326,133 @@ def outputDataToCSV():
         csvwriter.writerows(timeCSV)
     print("Write complete.")
 
+def smartTimeFormat(user_input: str) -> str:
+    """Convert loose formats like '14256' or '3934' into standard time durations."""
+    user_input = user_input.strip()
+    if ':' in user_input:
+        return fixDurationFormatting(user_input)
+    
+    # Accept formats like 14256 -> 1:42.56
+    digits = re.sub(r'\D', '', user_input)
+    if not digits.isdigit():
+        raise ValueError("Invalid time input.")
+    
+    if len(digits) < 3:
+        raise ValueError("Too short for a valid time.")
+
+    # Always interpret last two digits as hundredths
+    hundredths = digits[-2:]
+    remaining = digits[:-2]
+    seconds = remaining[-2:] if len(remaining) >= 2 else remaining
+    minutes = remaining[:-2] if len(remaining) > 2 else '0'
+
+    return f"00:{int(minutes):02}:{int(seconds):02}.{int(hundredths):02}"
+
+
+def manualEntryPrompt():
+    print("\nEntering Manual Entry Mode (type 'q' at any prompt to quit)\n")
+    print("Prefix name or event with '*' to persist across entries.")
+    print("Example: '*John Doe' will persist name.\n")
+
+    persistent_name = None
+    persistent_event = None
+
+    while True:
+        name = input("Enter swimmer's name (First Last): ").strip()
+        if name.lower() == 'q':
+            break
+        if name.startswith("*"):
+            persistent_name = name[1:].strip()
+            name = persistent_name
+        elif name == "":
+            if persistent_name:
+                name = persistent_name
+                print(f"Using persistent name: {name}")
+            else:
+                print("No name provided and no persistent name set.")
+                continue
+
+        division = input("Enter division (e.g., Div1): ").strip()
+        if division.lower() == 'q':
+            break
+
+        event = input("Enter event (e.g., 100FR): ").strip()
+        if event.lower() == 'q':
+            break
+        if event.startswith("*"):
+            persistent_event = event[1:].strip()
+            event = persistent_event
+        elif event == "":
+            if persistent_event:
+                event = persistent_event
+                print(f"Using persistent event: {event}")
+            else:
+                print("No event provided and no persistent event set.")
+                continue
+
+        raw_time = input("Enter time (e.g., 14256 or 1:42.56): ").strip()
+        if raw_time.lower() == 'q':
+            break
+
+        try:
+            formatted_time = smartTimeFormat(raw_time)
+
+            # Read data
+            timeCSV = readCSV(csv_output_file_name)
+            swimmerList = getSwimmerList(swimmer_info_file_name)
+
+            # Add swimmer if missing
+            swimmerList.append([name, division])
+            timeCSV = cleanUpCSV(swimmerList, timeCSV)
+
+            # Find event index
+            try:
+                event_index = timeCSV[0].index(event)
+            except ValueError:
+                raise Exception(f"Event '{event}' not found in CSV header.")
+
+            # Find or add swimmer row
+            row_found = False
+            for row in timeCSV:
+                if row[0] == name:
+                    row_found = True
+                    existing_time = row[event_index]
+                    break
+
+            if not row_found:
+                raise Exception(f"Swimmer {name} not found in timeCSV after cleanUpCSV.")
+
+            # Overwrite warning if applicable
+            should_write = True
+            if existing_time:
+                new_secs = durationToTime(formatted_time)
+                existing_secs = durationToTime(existing_time)
+                if new_secs > existing_secs:
+                    print(f"⚠️ Warning: {name}'s existing time for {event} is faster ({existing_time}) than new time ({formatted_time}).")
+                    confirm = input("Do you want to overwrite it? (y/n): ").strip().lower()
+                    if confirm not in {"y", "yes"}:
+                        should_write = False
+                        print("Entry skipped.")
+                        continue
+
+            if should_write:
+                timeCSV = writeEventToCSV(event, timeCSV, [[name, formatted_time]], force_write=True)
+                with open(csv_output_file_name, 'w', newline='') as csvfile:
+                    csv.writer(csvfile).writerows(timeCSV)
+                print(f"✅ Time {formatted_time} recorded for {name} in {event}.\n")
+
+        except Exception as e:
+            print(f"❌ Error: {e}\n")
+
+
 modeprompt = """
 What operation do you want to perform?
 \t1. Full run (download + write)
 \t2. Download PDFs
 \t3. Decode PDFs and write to CSV output
 \t4. Test new function (currently manual time entry)
-\t5. Exit
+\t5. Relay maker (make_medley_relay.py)
+\t6. Exit
 """
 
 pdf_folder_name = "grabbed_pdfs"
@@ -350,7 +472,7 @@ def main():
         except Exception as e:
             print(f"Did not recognize input as number. Error: {e}")
             return
-        if not(1 <= mode <= 5):
+        if not(1 <= mode <= 6):
             print("Number is not in options.")
             continue
         new_times = 0
@@ -359,19 +481,22 @@ def main():
             case 1:
                 downloadPDFs()
                 outputDataToCSV()
+                print(f"New times added: {new_times}")
+                print(f"Updated times: {updated_times}")
             case 2:
                 downloadPDFs()
             case 3:
                 outputDataToCSV()
+                print(f"New times added: {new_times}")
+                print(f"Updated times: {updated_times}")
             case 4:
-                pass
+                manualEntryPrompt()
             case 5:
                 return
             case _:
-                print("Unexpected error, please try again")
+                print("Unexpected error, exiting program.")
+                return
         print()
-        print(f"New times added: {new_times}")
-        print(f"Updated times: {updated_times}")
 
 if __name__ == "__main__":
     main()
