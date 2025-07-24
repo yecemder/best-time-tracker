@@ -5,6 +5,8 @@ import os
 import requests
 from weasyprint import HTML, CSS
 
+from make_medley_relay import *
+
 css = CSS(string="""
 @page {
     size: 8.5in 1000in;
@@ -492,6 +494,9 @@ def main():
             case 4:
                 manualEntryPrompt()
             case 5:
+                medley_main()
+            case 6:
+                print("Exiting program.")
                 return
             case _:
                 print("Unexpected error, exiting program.")
