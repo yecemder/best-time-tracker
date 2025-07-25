@@ -329,7 +329,8 @@ def outputDataToCSV():
     print("Write complete.")
 
 def smartTimeFormat(user_input: str) -> str:
-    """Convert loose formats like '14256' or '3934' into standard time durations."""
+    """Convert loose formats like '14256' or '3934' into standard time durations.
+    (e.g., '14256' -> '00:01:42.56', '3934' -> '00:00:39.34')"""
     user_input = user_input.strip()
     if ':' in user_input:
         return fixDurationFormatting(user_input)
