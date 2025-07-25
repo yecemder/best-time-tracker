@@ -203,16 +203,27 @@ def durationToTime(time: str):
     return total
 
 def cleanUpCSV(swimmerInfo: list[list[str]], csvData : list[list[str]]):
-    csvData = []  # TODO: Remove initial CSV data, this is a temporary fix for accidentally using old information
     
     # Ensure first row actually works
     if len(csvData) != 0:
         csvData[0] = ['Name','Div.','100IM','200IM','50FL','100FL','50BK','100BK','50BR','100BR','50FR','100FR']
-    else:
-        csvData = [['Name','Div.','100IM','200IM','50FL','100FL','50BK','100BK','50BR','100BR','50FR','100FR']]
     
     lengthOfRow = len(csvData[0])
     csvNames = [i[0] for i in csvData[1:]]
+    
+    # Check for updated or deleted swimmers
+    for i in range(len(csvData)-1, 0, -1):  # Start from the end to avoid index issues with popping
+        swimmer_entry = [csvData[i][0], csvData[i][1]]
+        swimmer_string = f"{swimmer_entry[0]} ({swimmer_entry[1]})"
+        if swimmer_entry not in swimmerInfo:
+            choice = input(f"Swimmer {swimmer_string} not found in swimmer list. Remove from CSV? (y/n): ").lower().strip()
+            if choice in {"y", "yes"}:
+                csvData.pop(i)
+                print(f"Swimmer {swimmer_string} removed from CSV.")
+            elif choice in {"n", "no"}:
+                print(f"Keeping swimmer {swimmer_string}.")
+            else:
+                print(f"Invalid input, keeping swimmer {swimmer_string}.")
     
     # Ensure all swimmers are added to CSV
     for swimmer in swimmerInfo:
@@ -258,8 +269,9 @@ def writeEventToCSV(eventName : str, csvData : list[list[str]], times : list[lis
                     row[eventIndex] = formattedTime
                     new_times += 1
                 elif durationToTime(formattedTime) < durationToTime(row[eventIndex]) or (
-                    force_write and durationToTime(formattedTime) >= durationToTime(row[eventIndex])):  
-                    # Preventative measure for blank times
+                    force_write and durationToTime(formattedTime) >= durationToTime(row[eventIndex])):
+                    # Redundant for casting tomfooleries
+                    
                     # print(f"Overwriting with {formattedTime} to {row[eventIndex]} swimmer: {time[0]}, index {eventIndex} ({eventName})")
                     row[eventIndex] = formattedTime
                     updated_times += 1
