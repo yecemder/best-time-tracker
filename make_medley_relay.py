@@ -152,38 +152,49 @@ def levenshtein_distance(s1, s2):
 
     return previous_row[-1]
 
-def name_fuzzy_search(name, csvtimes):
+def name_fuzzy_search(name, csvnames):
     # Build list of candidate names
-    name_list = [entry[0] for entry in csvtimes if entry[0]]
+    name_list = [entry for entry in csvnames if entry[0]]
     name_lower = name.lower()
     
     # Try to match exact names first
-    exact_matches = [candidate for candidate in name_list if candidate.lower() == name_lower]
+    exact_matches = [candidate for candidate in name_list if candidate[0].lower() == name_lower]
     if exact_matches:
-        return exact_matches
+        return [exact_matches[0]]
 
     # Try to match as a substring (allows partial input matches)
-    partial_matches = [candidate for candidate in name_list if name_lower in candidate.lower()]
+    partial_matches = [candidate for candidate in name_list if name_lower in candidate[0].lower()]
     if partial_matches:
         return sorted(partial_matches)
 
     # Fallback to fuzzy search using Levenshtein distance
     matches = []
-    threshold = 2
+    threshold = max(1, len(name_lower) // 3)  # Set a threshold based on the length of the input name
+    # Iterate through candidates and calculate Levenshtein distance
     for candidate in name_list:
-        distance = levenshtein_distance(name_lower, candidate.lower())
-        if distance <= threshold:
-            matches.append((distance, candidate))
+        candidate_lower = candidate[0].lower()
+        min_distance = float('inf')
+        # Slide a window over candidate to compare to the input
+        if len(candidate_lower) >= len(name_lower):
+            for i in range(len(candidate_lower) - len(name_lower) + 1):
+                window = candidate_lower[i:i+len(name_lower)]
+                d = levenshtein_distance(name_lower, window)
+                if d < min_distance:
+                    min_distance = d
+        else:
+            min_distance = levenshtein_distance(name_lower, candidate_lower)
+        if min_distance <= threshold:
+            matches.append((min_distance, candidate))
     
-    return [candidate for _, candidate in sorted(matches, key=lambda x: x[0])]
+    return [[candidate[0], candidate[1]] for _, candidate in sorted(matches, key=lambda x: x[0])]
 
 def choose_names(csvtimes):
     names = []
     while True:
-        name = input("\nEnter a swimmer's name (leave blank to finish): ").strip()
+        name = input("\nRelay Maker - Enter a swimmer's name (leave blank to finish): ").strip()
         if not name:
             break
-        possible_matches = name_fuzzy_search(name, csvtimes)
+        possible_matches = [match[0] for match in name_fuzzy_search(name, csvtimes)]
         if possible_matches:
             if len(possible_matches) == 1:
                 names.append(possible_matches[0])

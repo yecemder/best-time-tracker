@@ -142,7 +142,10 @@ def extractTimes(lines: list[str]) -> tuple[str, list[list[str]]]:
     else:
         raise Exception(f"Unable to decipher event: {firstline}")
 
-def getSwimmerList(filename):
+def getSwimmerList(filename, from_timelist=False):
+    if from_timelist:
+        data = readCSV(filename)
+        return [[entry[0], entry[1]] for entry in data if entry[0] and entry[1]][1:]
     output = readCSV(filename)
     return output[1:]
 
@@ -353,17 +356,21 @@ def smartTimeFormat(user_input: str) -> str:
 
 
 def manualEntryPrompt():
-    print("\nEntering Manual Entry Mode (type 'q' at any prompt to quit)\n")
+    print("\nEntering Manual Entry Mode.\n")
+    print("Type 'q' at any prompt to quit, or 'r' to restart your current entry.")
     print("Prefix name or event with '*' to persist across entries.")
-    print("Example: '*John Doe' will persist name.\n")
+    print("Example: '*John Doe' will persist name, which can be auto-entered if an input is left blank.\n")
 
     persistent_name = None
     persistent_event = None
 
     while True:
-        name = input("Enter swimmer's name (First Last): ").strip()
+        name = input("Manual Entry - Enter swimmer's name: ").strip()
         if name.lower() == 'q':
             break
+        if name.lower() == 'r':
+            print("Restarting current entry.")
+            continue
         if name.startswith("*"):
             persistent_name = name[1:].strip()
             name = persistent_name
@@ -375,13 +382,45 @@ def manualEntryPrompt():
                 print("No name provided and no persistent name set.")
                 continue
 
-        division = input("Enter division (e.g., Div1): ").strip()
+        swimmer_info = getSwimmerList(csv_output_file_name, from_timelist=True)  # Load swimmer list
+        
+        # Use fuzzy search for matching names
+        matches = name_fuzzy_search(name, swimmer_info)
+        
+        if len(matches) == 0:
+            print(f"No swimmer found matching: {name}")
+            division = input("Enter division (e.g., 3B): ").strip().upper()
+        elif len(matches) == 1:
+            name = matches[0][0]
+            division = matches[0][1]
+            print(f"Swimmer found: {name} with division {division}")
+        else:
+            print("Multiple swimmers found:")
+            for idx, match in enumerate(matches, 1):
+                print(f"{idx}: {match[0]} ({match[1]})")
+                try:
+                    choice = int(input("Select swimmer by number: ").strip())
+                    selected = matches[choice - 1]
+                    name = selected[0]
+                    division = selected[1]
+                except Exception as e:
+                    print("Invalid selection. Please try again.")
+                    continue
         if division.lower() == 'q':
             break
+        if division.lower() == 'r':
+            print("Restarting current entry.")
+            continue
+        elif division == "":
+            print("No division provided, restarting entry.")
+            continue
 
-        event = input("Enter event (e.g., 100FR): ").strip()
+        event = input("Enter event (e.g., 100FR): ").strip().upper()
         if event.lower() == 'q':
             break
+        if event.lower() == 'r':
+            print("Restarting current entry.")
+            continue
         if event.startswith("*"):
             persistent_event = event[1:].strip()
             event = persistent_event
@@ -390,7 +429,7 @@ def manualEntryPrompt():
                 event = persistent_event
                 print(f"Using persistent event: {event}")
             else:
-                print("No event provided and no persistent event set.")
+                print("No event provided and no persistent event set. Restarting entry.")
                 continue
 
         raw_time = input("Enter time (e.g., 14256 or 1:42.56): ").strip()
@@ -453,7 +492,7 @@ What operation do you want to perform?
 \t1. Full run (download + write)
 \t2. Download PDFs
 \t3. Decode PDFs and write to CSV output
-\t4. Test new function (currently manual time entry)
+\t4. Manual time entry
 \t5. Relay maker (make_medley_relay.py)
 \t6. Exit
 """
