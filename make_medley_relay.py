@@ -1,6 +1,7 @@
 import csv
 import os
 import itertools
+from time import perf_counter_ns as time
 
 best_time_file = "master_times.csv"
 
@@ -332,8 +333,10 @@ def medley_main():
         print("\nSelected swimmers and their times:")
         for swimmer, swimmer_times in times:
             print(f"{swimmer}: {swimmer_times}")
-        
+        st = time()
         find_best_combo(times)
+        nd = time()
+        print(f"\nTook {(nd - st) / 1_000_000} ms to determine.")
         return
 
 if __name__ == "__main__":
