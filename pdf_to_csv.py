@@ -146,15 +146,18 @@ def getSwimmerList(filename, from_timelist=False):
     if from_timelist:
         data = readCSV(filename)
         return [[entry[0], entry[1]] for entry in data if entry[0] and entry[1]][1:]
+    
     output = readCSV(filename)
     return output[1:]
 
 def sanitize_entries(times, swimmerlist):
     out = []
     onlyNames = [i[0] for i in swimmerlist]
+    
     for entry in times:
         if entry[0] in onlyNames:
             out.append(entry)
+    
     return out
 
 def fixDurationFormatting(time: str):
@@ -170,6 +173,7 @@ def fixDurationFormatting(time: str):
                     out[j] = '0'
             break
         out[i] = t[i]
+    
     return "".join(list(reversed(out)))
 
 def timeToDuration(time: float) -> str:
@@ -179,11 +183,13 @@ def timeToDuration(time: float) -> str:
         raise Exception(f"Attempted to convert invalid time to duration: {time}")
     if time == 0:
         return "00:00:00.00"
+    
     hours = int(time // 3600)
     time %= 3600
     minutes = int(time // 60)
     seconds = int(time % 60)
     dd = round(round(time - int(time), 2)*100)
+    
     return f"{hours:02}:{minutes:02}:{seconds:02}.{dd:02}"
 
 def durationToTime(time: str): 
@@ -263,11 +269,13 @@ def writeEventToCSV(eventName : str, csvData : list[list[str]], times : list[lis
         for row in csvData:
             if time[0] == row[0]:  # Found right name
                 formattedTime = fixDurationFormatting(time[1])
+                
                 # Check a better time than current or if time is empty
                 if row[eventIndex] == '':
                     # print(f"Writing {formattedTime} to EMPTY cell of swimmer: {time[0]}, index {eventIndex} ({eventName})")
                     row[eventIndex] = formattedTime
                     new_times += 1
+                
                 elif durationToTime(formattedTime) < durationToTime(row[eventIndex]) or (
                     force_write and durationToTime(formattedTime) >= durationToTime(row[eventIndex])):
                     # Redundant for casting tomfooleries
@@ -278,17 +286,22 @@ def writeEventToCSV(eventName : str, csvData : list[list[str]], times : list[lis
                 # else:
                     # print(f"Equal or better time found: {formattedTime} to {row[eventIndex]} swimmer: {time[0]}, index {eventIndex} ({eventName})")
                 break
+        
         else: 
             if ignoreOtherMissingNamesFlag == False or ignoreOtherMissingNamesFlag is None:
                 print(csvData)
                 c = input(f"Unable to find '{time[0]}' in CSV. Continue with operation? (y/n) ").lower().strip()
+                
                 if c in {"n", "no"}:
                     raise Exception(f"Execution stopped due to missing name: {time[0]}")
+                
                 elif c in {"y", "yes"} and ignoreOtherMissingNamesFlag is None:
                     c = input(f"Hide prompt warning for future missing names? (y/n) ").lower().strip()
+                    
                     if c in {"y", "yes"}:
                         ignoreOtherMissingNamesFlag = True
                         print("Will NOT prompt for any further invalid names.")
+                    
                     else:
                         ignoreOtherMissingNamesFlag = False
                         print("Will continue to prompt for further invalid names.")
@@ -300,6 +313,7 @@ def writeEventToCSV(eventName : str, csvData : list[list[str]], times : list[lis
 def getPDFData(pdf_folder_name: str):
     print(f"Grabbing files from folder: {pdf_folder_name}")
     files = os.listdir(pdf_folder_name)
+    
     data = []
     for file in files:
         if file[-4:] != ".pdf":
@@ -366,7 +380,6 @@ def smartTimeFormat(user_input: str) -> str:
 
     return f"00:{int(minutes):02}:{int(seconds):02}.{int(hundredths):02}"
 
-
 def manualEntryPrompt():
     print("\nEntering Manual Entry Mode.\n")
     print("Type 'q' at any prompt to quit, or 'r' to restart your current entry.")
@@ -378,14 +391,18 @@ def manualEntryPrompt():
 
     while True:
         name = input("Manual Entry - Enter swimmer's name: ").strip()
+        
         if name.lower() == 'q':
             break
+        
         if name.lower() == 'r':
             print("Restarting current entry.")
             continue
+        
         if name.startswith("*"):
             persistent_name = name[1:].strip()
             name = persistent_name
+        
         elif name == "":
             if persistent_name:
                 name = persistent_name
@@ -402,10 +419,12 @@ def manualEntryPrompt():
         if len(matches) == 0:
             print(f"No swimmer found matching: {name}")
             division = input("Enter division (e.g., 3B): ").strip().upper()
+        
         elif len(matches) == 1:
             name = matches[0][0]
             division = matches[0][1]
             print(f"Swimmer found: {name} with division {division}")
+        
         else:
             print("Multiple swimmers found:")
             for idx, match in enumerate(matches, 1):
@@ -418,6 +437,7 @@ def manualEntryPrompt():
                 except Exception as e:
                     print("Invalid selection. Please try again.")
                     continue
+        
         if division.lower() == 'q':
             break
         if division.lower() == 'r':
@@ -428,18 +448,23 @@ def manualEntryPrompt():
             continue
 
         event = input("Enter event (e.g., 100FR): ").strip().upper()
+        
         if event.lower() == 'q':
             break
+        
         if event.lower() == 'r':
             print("Restarting current entry.")
             continue
+        
         if event.startswith("*"):
             persistent_event = event[1:].strip()
             event = persistent_event
+        
         elif event == "":
             if persistent_event:
                 event = persistent_event
                 print(f"Using persistent event: {event}")
+            
             else:
                 print("No event provided and no persistent event set. Restarting entry.")
                 continue
@@ -497,7 +522,6 @@ def manualEntryPrompt():
 
         except Exception as e:
             print(f"❌ Error: {e}\n")
-
 
 modeprompt = """
 What operation do you want to perform?
