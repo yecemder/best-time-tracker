@@ -529,8 +529,8 @@ What operation do you want to perform?
 \t2. Download PDFs
 \t3. Decode PDFs and write to CSV output
 \t4. Manual time entry
-\t5. Relay maker (make_medley_relay.py)
-\t6. Exit
+\t5. Relay tool
+\tQ. Exit
 """
 
 pdf_folder_name = "grabbed_pdfs"
@@ -546,13 +546,14 @@ def main():
     while True:
         mode = input(modeprompt).strip()
         try:
-            mode = int(mode)
+            if mode.lower() == 'q':
+                print("Exiting program.")
+                return
+            mode = abs(int(mode))
         except Exception as e:
             print(f"Did not recognize input as number. Error: {e}")
             return
-        if not(1 <= mode <= 6):
-            print("Number is not in options.")
-            continue
+        
         new_times = 0
         updated_times = 0
         match mode:
@@ -571,13 +572,10 @@ def main():
                 manualEntryPrompt()
             case 5:
                 medley_main()
-            case 6:
-                print("Exiting program.")
-                return
+                input("Press Enter to continue...")
             case _:
                 print("Unexpected error, exiting program.")
                 return
-        print()
 
 if __name__ == "__main__":
     main()
