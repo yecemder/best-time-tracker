@@ -5,7 +5,7 @@ import os
 import requests
 from weasyprint import HTML, CSS
 
-from make_medley_relay import *
+from relay_tools import *
 
 css = CSS(string="""
 @page {
