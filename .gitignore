@@ -1,5 +1,6 @@
 # Project-specific
 grabbed_pdfs/
+.vscode/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
