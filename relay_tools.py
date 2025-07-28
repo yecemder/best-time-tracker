@@ -91,9 +91,14 @@ def choose_divisions():
                 print(f"Invalid O division: {div}")
                 return choose_divisions()
         
+        elif div in ["Q", "QUIT"]:
+            print("Quiting division selection.")
+            return None
+        
         else:
-            print(f"Invalid division format: {div}")
+            print(f"Invalid division: {div}")
             return choose_divisions()
+    
     return divs
 
 def hundred_to_fifty(time):
@@ -206,10 +211,23 @@ def name_fuzzy_search(name, csvnames):
     
     return [[candidate[0], candidate[1]] for _, candidate in sorted(matches, key=lambda x: x[0])]
 
-def choose_names(csvtimes, min_names=0, max_names=float('inf')):
+def choose_names(csvtimes, input_mode, min_names=0, max_names=float('inf')):
     names = []
+    
+    if input_mode not in [1, 2, 3]:
+        raise ValueError("Invalid input mode for choosing names. (Internal error, should not happen)")
+    if min_names < 0 or max_names < min_names:
+        raise ValueError("Invalid minimum or maximum number of names specified.")
+    
+    if input_mode in [1, 2]:
+        input_prompt = "IDEAL RELAY - Enter a name (leave blank to finish): "
+    elif input_mode in [3]:
+        input_prompt = "RELAY TIME - Enter a name (leave blank to finish): "
+    else:
+        raise ValueError("Invalid input mode for choosing names. (Internal error, should not happen)")
+    
     while len(names) < max_names:
-        name = input("\nRelay Maker - Enter a swimmer's name (leave blank to finish): ").strip()
+        name = input("\n" + input_prompt).strip()
         if not name:
             break
         possible_matches = [match[0] for match in name_fuzzy_search(name, csvtimes)]
@@ -286,52 +304,75 @@ def find_minimum_sum_combination(times):
 
     return best_choice, min_sum
 
-def find_best_combo(times):
+def find_best_combo(times, relay_type):
     # Minimum number of swimmers is 4, one for each stroke.
     if len(times) < 4:
         print("Not enough swimmers to form a relay team. At least 4 swimmers are required.")
-        return    
+        return
     
     # Convert string times to float values.    
     for i in range(len(times)):
         times[i] = (times[i][0], [durationToTime(t) if t else None for t in times[i][1]])
     
-    
-    # The default order in the input grid corresponds to these strokes:
-    default_strokes = ["FLY", "BACK", "BREAST", "FREE"]
-    # Specify desired output order here (e.g., ["BACK", "BREAST", "FLY", "FREE"])
-    output_strokes = ["BACK", "BREAST", "FLY", "FREE"]
+    if relay_type == "medley":
+        # The default order in the input grid corresponds to these strokes:
+        default_strokes = ["FLY", "BACK", "BREAST", "FREE"]
+        # Specify desired output order here (e.g., ["BACK", "BREAST", "FLY", "FREE"])
+        output_strokes = ["BACK", "BREAST", "FLY", "FREE"]
 
-    best_choice, min_sum = find_minimum_sum_combination(times)
-    
-    if best_choice is None or min_sum is None:
-        print("No valid combination exists (one stroke has no valid float values).")
-        return
-    else:
-        # Reorder the chosen combination to match the desired output order.
-        ordered_choice = []
-        for stroke in output_strokes:
-            idx = default_strokes.index(stroke)
-            ordered_choice.append(best_choice[idx])
+        best_choice, min_sum = find_minimum_sum_combination(times)
+        
+        if best_choice is None or min_sum is None:
+            print("No valid combination exists (one stroke has no valid float values).")
+            return
+        else:
+            # Reorder the chosen combination to match the desired output order.
+            ordered_choice = []
+            for stroke in output_strokes:
+                idx = default_strokes.index(stroke)
+                ordered_choice.append(best_choice[idx])
             
-        print("\nBest relay combination:")
-        # print(list(zip(output_strokes, ordered_choice)))
-        for stroke in output_strokes:
-            idx = default_strokes.index(stroke)
-            row_index, time_value = best_choice[idx]
-            swimmer_name = times[row_index][0]
-            print(f"{stroke}: {swimmer_name}, time {timeToDuration(time_value)}")
-        print(f"\nTotal relay time: {timeToDuration(min_sum)}")
+            print("\nBest medley relay combination:")
+            # print(list(zip(output_strokes, ordered_choice)))
+            for stroke in output_strokes:
+                idx = default_strokes.index(stroke)
+                row_index, time_value = best_choice[idx]
+                swimmer_name = times[row_index][0]
+                print(f"{stroke}: {swimmer_name}, time {timeToDuration(time_value)}")
+            print(f"\nTotal relay time: {timeToDuration(min_sum)}")
+    else:
+        # For freestyle, we just need to sort by the freestyle times.
+        free_times = [(entry[0], entry[1][3]) for entry in times]  # Get only the freestyle times
+        free_times = [entry for entry in free_times if entry[1] is not None]  # Filter out None values
+        if len(free_times) < 4:
+            print("Not enough swimmers with valid freestyle times to form a relay team.")
+            return
+        # Sort by freestyle time
+        free_times.sort(key=lambda x: x[1])
+        free_times.insert(3, free_times.pop(0))  # Move the fastest swimmer to the end (4th position)
+        print("\nBest freestyle relay combination:")
+        for swimmer, time in free_times[:4]:  # Take the top 4 swimmers
+            print(f"FREE: {swimmer}, time {timeToDuration(time)}")
 
-def get_type_of_relay():
-    mode_prompt = """What type of relay would you like to test?
-        1. Medley Relay
-        2. Freestyle Relay\n"""
-    relay_type = input(mode_prompt).strip()
+def get_type_of_relay(mode):
+    if mode in [3]:
+        mode_prompt = """
+            Type of relay to TEST:
+            1. Medley Relay
+            2. Freestyle Relay\n"""
+    elif mode in [1, 2]:
+        mode_prompt = """
+            Type of relay to MAKE:
+            1. Medley Relay
+            2. Freestyle Relay\n"""
+    else:
+        raise ValueError("Mode selected is not recognized for relay type selection. (Internal error)")
+    
+    relay_type = input(mode_prompt).strip().lower()
     match relay_type:
-        case '1':
+        case '1' | 'm' | 'medley':
             return "medley"
-        case '2':
+        case '2' | 'f' | 'freestyle':
             return "freestyle"
         case '' | 'q' | 'quit':
             print("Exiting.")
@@ -413,7 +454,7 @@ def medley_main():
     print("Welcome to the Relay Maker!")
     while True:
         
-        mode = choose_mode()
+        input_mode = choose_mode()
         # if mode is None:
         #     return
         
@@ -428,12 +469,12 @@ def medley_main():
         #         continue
         #     times = get_swimtimes_byname(names, csvdata)
         
-        match mode:
+        match input_mode:
             case 0:
                 print("Invalid mode selected. Please try again.")
                 continue
             case 1:
-                names = choose_names(csvdata)
+                names = choose_names(csvdata, input_mode)
                 if not names:
                     continue
                 times = get_swimtimes_byname(names, csvdata)
@@ -443,13 +484,13 @@ def medley_main():
                     continue
                 times = get_swimtimes_bydiv(divs, csvdata)
             case 3:
-                names = choose_names(csvdata, min_names=4, max_names=4)
+                names = choose_names(csvdata, input_mode, min_names=4, max_names=4)
                 if not names:
                     continue
                 times = get_swimtimes_byname(names, csvdata)
             case None:
                 print("Exiting the Relay Maker.")
-                return
+                return 1
             case _:
                 return
         
@@ -460,17 +501,17 @@ def medley_main():
         print("\nSelected swimmers and their times:")
         max_name_length = max(len(swimmer[0]) for swimmer in times)
         for swimmer, swimmer_times in times:
-            print(f"{swimmer}:{' '*max(1, max_name_length-len(swimmer)+1)}{'\t'.join([t if t is not None else 'N/A'+8*' ' for t in swimmer_times])}")
+            print(f"{swimmer}:{' '*max(1, max_name_length-len(swimmer)+1)}{'\t'.join([t if t is not None else 8*' '+'N/A' for t in swimmer_times])}")
             # print(f"{swimmer}: {'\t'.join([t for t in swimmer_times if t is not None else 'None'])}")
-        if mode == 3:
-            relay_mode = get_type_of_relay()
+        
+        relay_type = get_type_of_relay(input_mode)
         
         st = time()
-        match mode:
+        match input_mode:
             case 1 | 2:
-                find_best_combo(times)
+                find_best_combo(times, relay_type)
             case 3:
-                if not(relay_time(times, relay_mode)):
+                if not(relay_time(times, relay_type)):
                     continue
             case _:
                 print("Theoretically impossible error: mode not recognized.")
@@ -480,8 +521,8 @@ def medley_main():
 
 
 if __name__ == "__main__":
-    while True:
-        medley_main()
+    while medley_main() is None:
+        continue
 
 # print(get_swimtimes_bydiv(['3B'], times))
 # print(get_swimtimes_byname(['Matthew Mizukami'], times))
