@@ -1,3 +1,5 @@
+print("Importing libraries...")
+
 import csv
 from pypdf import PdfReader
 import re
@@ -6,6 +8,8 @@ import requests
 from weasyprint import HTML, CSS
 
 from relay_tools import *
+
+print("Libraries imported successfully.")
 
 css = CSS(string="""
 @page {
@@ -60,6 +64,14 @@ def getAllEvents(combos):
         )
         print(f"Finished {event[0]}{event[2]}{strokeToShorthand[event[1]]}")
     return
+
+def ensureFolder():
+    """Ensures that the folder for PDFs exists."""
+    if not os.path.exists(pdf_folder_name):
+        os.makedirs(pdf_folder_name)
+        print(f"Created folder: {pdf_folder_name}")
+    else:
+        print(f"Folder already exists: {pdf_folder_name}")
 
 def readPDFFile(filename: str):
     """Parses a PDF file with best times and returns list of lines with best times.
@@ -312,9 +324,16 @@ def writeEventToCSV(eventName : str, csvData : list[list[str]], times : list[lis
 
 def getPDFData(pdf_folder_name: str):
     print(f"Grabbing files from folder: {pdf_folder_name}")
-    files = os.listdir(pdf_folder_name)
     
+    files = os.listdir(pdf_folder_name)
     data = []
+    
+    if len(files) == 0:
+        print("WARNING: No files found in PDF folder.")
+        return data
+    else:
+        print(f"Found {len(files)} files in PDF folder.")
+    
     for file in files:
         if file[-4:] != ".pdf":
             print(f"Warning: Non-PDF file found in PDF folder: {file}")
@@ -324,13 +343,40 @@ def getPDFData(pdf_folder_name: str):
     
     return data
 
+
+def smartTimeFormat(user_input: str) -> str:
+    """Convert loose formats like '14256' or '3934' into standard time durations.
+    (e.g., '14256' -> '00:01:42.56', '3934' -> '00:00:39.34')"""
+    user_input = user_input.strip()
+    if ':' in user_input:
+        return fixDurationFormatting(user_input)
+    
+    # Accept formats like 14256 -> 1:42.56
+    digits = re.sub(r'\D', '', user_input)
+    if not digits.isdigit():
+        raise ValueError("Invalid time input.")
+    
+    if len(digits) < 3:
+        raise ValueError("Too short for a valid time.")
+
+    # Always interpret last two digits as hundredths
+    hundredths = digits[-2:]
+    remaining = digits[:-2]
+    seconds = remaining[-2:] if len(remaining) >= 2 else remaining
+    minutes = remaining[:-2] if len(remaining) > 2 else '0'
+
+    return f"00:{int(minutes):02}:{int(seconds):02}.{int(hundredths):02}"
+
 def downloadPDFs():
+    ensureFolder()  # Ensure the folder exists
+    print("Creating event parameters...")
     events = createEventParameters()
     print("Beginning event data fetch...")
     getAllEvents(events)
     print("Event data download complete.")
 
 def outputDataToCSV():
+    ensureFolder()
     print("Decoding PDF Data...")
     timeData = getPDFData(pdf_folder_name)  # Decode PDF data
     
@@ -356,29 +402,6 @@ def outputDataToCSV():
         csvwriter = csv.writer(csvfile)
         csvwriter.writerows(timeCSV)
     print("Write complete.")
-
-def smartTimeFormat(user_input: str) -> str:
-    """Convert loose formats like '14256' or '3934' into standard time durations.
-    (e.g., '14256' -> '00:01:42.56', '3934' -> '00:00:39.34')"""
-    user_input = user_input.strip()
-    if ':' in user_input:
-        return fixDurationFormatting(user_input)
-    
-    # Accept formats like 14256 -> 1:42.56
-    digits = re.sub(r'\D', '', user_input)
-    if not digits.isdigit():
-        raise ValueError("Invalid time input.")
-    
-    if len(digits) < 3:
-        raise ValueError("Too short for a valid time.")
-
-    # Always interpret last two digits as hundredths
-    hundredths = digits[-2:]
-    remaining = digits[:-2]
-    seconds = remaining[-2:] if len(remaining) >= 2 else remaining
-    minutes = remaining[:-2] if len(remaining) > 2 else '0'
-
-    return f"00:{int(minutes):02}:{int(seconds):02}.{int(hundredths):02}"
 
 def manualEntryPrompt():
     print("\nEntering Manual Entry Mode.\n")
