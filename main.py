@@ -571,8 +571,8 @@ def main():
             case 4:
                 manualEntryPrompt()
             case 5:
-                medley_main()
-                input("Press Enter to continue...")
+                if not(medley_main()):
+                    input("Press Enter to continue...")
             case _:
                 print("Unexpected error, exiting program.")
                 return
