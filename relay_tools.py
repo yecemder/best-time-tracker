@@ -451,23 +451,11 @@ def medley_main():
     if not csvdata:
         print("No times found in the best time sheet.")
         return
+    
     print("Welcome to the Relay Maker!")
     while True:
         
         input_mode = choose_mode()
-        # if mode is None:
-        #     return
-        
-        # if mode:
-        #     divs = choose_divisions()
-        #     if divs is None:
-        #         continue
-        #     times = get_swimtimes_bydiv(divs, csvdata)
-        # else:
-        #     names = choose_names(csvdata)
-        #     if not names:
-        #         continue
-        #     times = get_swimtimes_byname(names, csvdata)
         
         match input_mode:
             case 0:
@@ -523,8 +511,3 @@ def medley_main():
 if __name__ == "__main__":
     while medley_main() is None:
         continue
-
-# print(get_swimtimes_bydiv(['3B'], times))
-# print(get_swimtimes_byname(['Matthew Mizukami'], times))
-
-# print(choose_names(times))
