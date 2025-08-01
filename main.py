@@ -6,6 +6,7 @@ import re
 import os
 import requests
 from weasyprint import HTML, CSS
+from typing import Any
 
 from relay_tools import *
 
@@ -106,6 +107,10 @@ def readCSV(csvName: str):
             rows.append(row)
     
     return rows
+
+def writeCSV(csvName: str, rows: list[Any]):
+    with open(csvName, 'w', newline='') as csvfile:
+        csv.writer(csvfile).writerows(rows)
 
 def extractTimes(lines: list[str]) -> tuple[str, list[list[str]]]:
     output = []
@@ -383,13 +388,13 @@ def manualEntryPrompt():
     print("\nEntering Manual Entry Mode.\n")
     print("Type 'q' at any prompt to quit, or 'r' to restart your current entry.")
     print("Prefix name or event with '*' to persist across entries.")
-    print("Example: '*John Doe' will persist name, which can be auto-entered if an input is left blank.\n")
+    print("Example: '*John Doe' will persist name, which can be auto-entered if an input is left blank.")
 
     persistent_name = None
     persistent_event = None
 
     while True:
-        name = input("Manual Entry - Enter swimmer's name: ").strip()
+        name = input("\nManual Entry - Enter swimmer's name: ").strip()
         
         if name.lower() == 'q':
             break
@@ -414,10 +419,11 @@ def manualEntryPrompt():
         
         # Use fuzzy search for matching names
         matches = name_fuzzy_search(name, swimmer_info)
-        
+        new_swimmer = False
         if len(matches) == 0:
             print(f"No swimmer found matching: {name}")
             division = input("Enter division (e.g., 3B): ").strip().upper()
+            new_swimmer = True
         
         elif len(matches) == 1:
             name = matches[0][0]
@@ -428,14 +434,15 @@ def manualEntryPrompt():
             print("Multiple swimmers found:")
             for idx, match in enumerate(matches, 1):
                 print(f"{idx}: {match[0]} ({match[1]})")
-                try:
-                    choice = int(input("Select swimmer by number: ").strip())
-                    selected = matches[choice - 1]
-                    name = selected[0]
-                    division = selected[1]
-                except Exception as e:
-                    print("Invalid selection. Please try again.")
-                    continue
+            try:
+                choice = int(input("Select swimmer by number: ").strip())
+                selected = matches[choice - 1]
+                name = selected[0]
+                division = selected[1]
+                print(f"Selected {name} ({division}).")
+            except Exception as e:
+                print("Invalid selection. Please try again.")
+                continue
         
         if division.lower() == 'q':
             break
@@ -445,6 +452,12 @@ def manualEntryPrompt():
         elif division == "":
             print("No division provided, restarting entry.")
             continue
+        
+        # Validate division
+        if new_swimmer:
+            valids = [f"{n}B" for n in range(1, 9)] + [f"{n}G" for n in range(1, 9)] + ["O1G", "O2G", "O1B", "O2B"]
+            if division not in valids:
+                print("Division not found in valid ")
         
         timeCSV = cleanUpCSV(swimmer_info + [[name, division]], readCSV(csv_output_file_name))
 
@@ -498,6 +511,12 @@ def manualEntryPrompt():
             if not row_found:
                 raise Exception(f"Swimmer {name} not found in timeCSV after cleanUpCSV. (Should be impossible)")
 
+            # Add swimmer to list for time pulling if new name
+            if new_swimmer:
+                name_list = readCSV(swimmer_info_file_name)
+                name_list.append([name, division])
+                writeCSV(swimmer_info_file_name, name_list)
+            
             # Overwrite warning if applicable
             should_write = True
             if existing_time:
