@@ -171,20 +171,22 @@ def sanitize_entries(times, swimmerlist):
     return out
 
 def fixDurationFormatting(time: str):
-    t = list(time)
-    t.reverse()
-    out = ['', '', ':', '', '', ':', '', '', '.', '', '']
-    out.reverse()
+    t = list(time)  # Split into characters
+    t = [num for num in t if num.isnumeric()]  # Leave only numbers
     
-    for i in range(len(out)):
-        if i>=len(t):
+    out = ['', '', '.', '', '', ':', '', '', ':', '', '']  # Duration, starting backwards
+    
+    for i in range(len(out)):  # Iterate over digits of output
+        if len(t) == 0:
             for j in range(i, len(out)):
                 if out[j] == '':
                     out[j] = '0'
             break
-        out[i] = t[i]
-    
-    return "".join(list(reversed(out)))
+        if out[i] == '':
+            out[i] = t.pop()
+        
+    out.reverse()
+    return "".join(out)
 
 def timeToDuration(time: float) -> str:
     if not isinstance(time, (float, int)):
@@ -248,7 +250,7 @@ def cleanUpCSV(swimmerInfo: list[list[str]], csvData : list[list[str]]):
         
         else:
             csvData.append([swimmer[0], swimmer[1]] + [''] * (lengthOfRow-2))
-            print(f"Swimmer {swimmer[0]} was not found in sheet, has added to the CSV.")
+            print(f"Swimmer {swimmer[0]} ({swimmer[1]}) was not found in sheet, and was added to the CSV.")
     
     csvData[1:] = sorted(csvData[1:], key=lambda x: x[0])  # Sort CSV by first name, excluding header row
     
@@ -340,30 +342,6 @@ def getPDFData(pdf_folder_name: str):
         print(f"Extracted times from {pdf_folder_name}/{file}")
     
     return data
-
-
-def smartTimeFormat(user_input: str) -> str:
-    """Convert loose formats like '14256' or '3934' into standard time durations.
-    (e.g., '14256' -> '00:01:42.56', '3934' -> '00:00:39.34')"""
-    user_input = user_input.strip()
-    if ':' in user_input:
-        return fixDurationFormatting(user_input)
-    
-    # Accept formats like 14256 -> 1:42.56
-    digits = re.sub(r'\D', '', user_input)
-    if not digits.isdigit():
-        raise ValueError("Invalid time input.")
-    
-    if len(digits) < 3:
-        raise ValueError("Too short for a valid time.")
-
-    # Always interpret last two digits as hundredths
-    hundredths = digits[-2:]
-    remaining = digits[:-2]
-    seconds = remaining[-2:] if len(remaining) >= 2 else remaining
-    minutes = remaining[:-2] if len(remaining) > 2 else '0'
-
-    return f"00:{int(minutes):02}:{int(seconds):02}.{int(hundredths):02}"
 
 def downloadPDFs():
     ensureFolder()  # Ensure the folder exists
@@ -467,6 +445,8 @@ def manualEntryPrompt():
         elif division == "":
             print("No division provided, restarting entry.")
             continue
+        
+        timeCSV = cleanUpCSV(swimmer_info + [[name, division]], readCSV(csv_output_file_name))
 
         event = input("Enter event (e.g., 100FR): ").strip().upper()
         
@@ -489,7 +469,13 @@ def manualEntryPrompt():
             else:
                 print("No event provided and no persistent event set. Restarting entry.")
                 continue
-
+        
+        try:
+            event_index = timeCSV[0].index(event)
+        except ValueError:
+            print("Event not found.")
+            continue
+        
         raw_time = input("Enter time (e.g., 14256 or 1:42.56): ").strip()
         if raw_time.lower() == 'q':
             break
@@ -499,21 +485,7 @@ def manualEntryPrompt():
             continue
 
         try:
-            formatted_time = smartTimeFormat(raw_time)
-
-            # Read data
-            timeCSV = readCSV(csv_output_file_name)
-            swimmerList = getSwimmerList(swimmer_info_file_name)
-
-            # Add swimmer if missing
-            swimmerList.append([name, division])
-            timeCSV = cleanUpCSV(swimmerList, timeCSV)
-
-            # Find event index
-            try:
-                event_index = timeCSV[0].index(event)
-            except ValueError:
-                raise Exception(f"Event '{event}' not found in CSV header.")
+            formatted_time = fixDurationFormatting(raw_time)
 
             # Find or add swimmer row
             row_found = False
@@ -524,7 +496,7 @@ def manualEntryPrompt():
                     break
 
             if not row_found:
-                raise Exception(f"Swimmer {name} not found in timeCSV after cleanUpCSV.")
+                raise Exception(f"Swimmer {name} not found in timeCSV after cleanUpCSV. (Should be impossible)")
 
             # Overwrite warning if applicable
             should_write = True
