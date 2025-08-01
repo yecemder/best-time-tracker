@@ -156,11 +156,9 @@ def extractTimes(lines: list[str]) -> tuple[str, list[list[str]]]:
 
 def getSwimmerList(filename, from_timelist=False):
     if from_timelist:
-        data = readCSV(filename)
-        return [[entry[0], entry[1]] for entry in data if entry[0] and entry[1]][1:]
+        return [[entry[0], entry[1]] for entry in readCSV(filename) if entry[0] and entry[1]][1:]
     
-    output = readCSV(filename)
-    return output[1:]
+    return readCSV(filename)[1:]
 
 def sanitize_entries(times, swimmerlist):
     out = []
