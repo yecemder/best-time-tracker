@@ -394,7 +394,7 @@ def manualEntryPrompt():
     persistent_event = None
 
     while True:
-        name = input("\nManual Entry - Enter swimmer's name: ").strip()
+        name = input("\nMANUAL ENTRY - Enter swimmer's name: ").strip()
         
         if name.lower() == 'q':
             break
@@ -457,39 +457,51 @@ def manualEntryPrompt():
         if new_swimmer:
             valids = [f"{n}B" for n in range(1, 9)] + [f"{n}G" for n in range(1, 9)] + ["O1G", "O2G", "O1B", "O2B"]
             if division not in valids:
-                print("Division not found in valid ")
+                print("Division not found in valids.")
+                continue
         
         timeCSV = cleanUpCSV(swimmer_info + [[name, division]], readCSV(csv_output_file_name))
 
-        event = input("Enter event (e.g., 100FR): ").strip().upper()
+        event = input(
+                f"Enter event{' or time (E: '+persistent_event+')' 
+                if persistent_event is not None else ''}: "
+            ).strip().upper().replace(' ', '')
         
-        if event.lower() == 'q':
-            break
-        
-        if event.lower() == 'r':
-            print("Restarting current entry.")
-            continue
-        
-        if event.startswith("*"):
-            persistent_event = event[1:].strip()
+        if not any(i.isalpha() for i in list(event)) and persistent_event is not None:
+            # Assume times are input into the event if a persistent event is defined
+            # and there are no letters in the event.
+            raw_time = event
             event = persistent_event
-        
-        elif event == "":
-            if persistent_event:
-                event = persistent_event
-                print(f"Using persistent event: {event}")
             
-            else:
-                print("No event provided and no persistent event set. Restarting entry.")
+        else:
+            if event.lower() == 'q':
+                break
+            
+            if event.lower() == 'r':
+                print("Restarting current entry.")
                 continue
+            
+            if event.startswith("*"):
+                persistent_event = event[1:].strip()
+                event = persistent_event
+            
+            elif event == "":
+                if persistent_event:
+                    event = persistent_event
+                    print(f"Using persistent event: {event}")
+                
+                else:
+                    print("No event provided and no persistent event set. Restarting entry.")
+                    continue
+            
+            try:
+                event_index = timeCSV[0].index(event)
+            except ValueError:
+                print("Event not found.")
+                continue
+            
+            raw_time = input("Enter time (e.g., 14256 or 1:42.56): ").strip()
         
-        try:
-            event_index = timeCSV[0].index(event)
-        except ValueError:
-            print("Event not found.")
-            continue
-        
-        raw_time = input("Enter time (e.g., 14256 or 1:42.56): ").strip()
         if raw_time.lower() == 'q':
             break
         
