@@ -495,6 +495,10 @@ def manualEntryPrompt():
         raw_time = input("Enter time (e.g., 14256 or 1:42.56): ").strip()
         if raw_time.lower() == 'q':
             break
+        
+        if raw_time.lower() == 'r':
+            print("Restarting current entry.")
+            continue
 
         try:
             formatted_time = smartTimeFormat(raw_time)
