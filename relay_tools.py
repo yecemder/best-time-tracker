@@ -353,6 +353,7 @@ def find_best_combo(times, relay_type):
         print("\nBest freestyle relay combination:")
         for swimmer, time in free_times[:4]:  # Take the top 4 swimmers
             print(f"FREE: {swimmer}, time {timeToDuration(time)}")
+        print(f"\nTotal relay time: {timeToDuration(sum(i[1] for i in free_times[:4]))}")
 
 def get_type_of_relay(mode):
     if mode in [3]:
