@@ -66,13 +66,23 @@ def getAllEvents(combos):
         print(f"Finished {event[0]}{event[2]}{strokeToShorthand[event[1]]}")
     return
 
-def ensureFolder():
-    """Ensures that the folder for PDFs exists."""
+def ensureNeededFiles():
+    """Ensures that the needed files for operations exist."""
     if not os.path.exists(pdf_folder_name):
         os.makedirs(pdf_folder_name)
         print(f"Created folder: {pdf_folder_name}")
     else:
         print(f"Folder already exists: {pdf_folder_name}")
+    
+    if not os.path.exists(csv_output_file_name):
+        with open(csv_output_file_name, 'w', newline='') as f:
+            pass
+        print(f"Created file: {csv_output_file_name}")
+    
+    if not os.path.exists(swimmer_info_file_name):
+        with open(swimmer_info_file_name, 'w', newline='') as f:
+            pass
+        print(f"Created file: {swimmer_info_file_name}")
 
 def readPDFFile(filename: str):
     """Parses a PDF file with best times and returns list of lines with best times.
@@ -230,6 +240,8 @@ def cleanUpCSV(swimmerInfo: list[list[str]], csvData : list[list[str]]):
     # Ensure first row actually works
     if len(csvData) != 0:
         csvData[0] = ['Name','Div.','100IM','200IM','50FL','100FL','50BK','100BK','50BR','100BR','50FR','100FR']
+    else:
+        csvData = [['Name','Div.','100IM','200IM','50FL','100FL','50BK','100BK','50BR','100BR','50FR','100FR']]
     
     lengthOfRow = len(csvData[0])
     csvNames = [i[0] for i in csvData[1:]]
@@ -349,7 +361,7 @@ def getPDFData(pdf_folder_name: str):
     return data
 
 def downloadPDFs():
-    ensureFolder()  # Ensure the folder exists
+    ensureNeededFiles()  # Ensure the folder exists
     print("Creating event parameters...")
     events = createEventParameters()
     print("Beginning event data fetch...")
@@ -357,7 +369,7 @@ def downloadPDFs():
     print("Event data download complete.")
 
 def outputDataToCSV():
-    ensureFolder()
+    ensureNeededFiles()
     print("Decoding PDF Data...")
     timeData = getPDFData(pdf_folder_name)  # Decode PDF data
     
