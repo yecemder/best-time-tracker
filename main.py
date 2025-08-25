@@ -1,40 +1,49 @@
 print("Importing libraries...")
 
 import csv
-from pypdf import PdfReader
 import re
 import os
 import requests
-from weasyprint import HTML, CSS
 from typing import Any
 
 from relay_tools import *
 
 print("Libraries imported successfully.")
 
-css = CSS(string="""
-@page {
-    size: 8.5in 1000in;
-    margin: 0.01in;
-}
-
-@media print {
-    body {
-        font-family: sans-serif;
-        color: black;
-        background: white;
+def downloadSwimResultsHTML(sex, strokenum, distance):
+    s = requests.Session()
+    resp1 = s.get("https://sports-tek.active.com/tmonline/")
+    try:
+        resp1.raise_for_status()
+    except requests.HTTPError:
+        return
+    payload = {
+    'STRIPPED': 'BCSSAProvincialOffice',
+    'SETTEAM': 'T'
     }
+    
+    resp2 = s.get("https://sports-tek.active.com/tmonline/index.asp?STRIPPED=BCSSAProvincialOffice", data=payload)
+    try:
+        resp2.raise_for_status()
+    except requests.HTTPError:
+        return
+    
+    url = rf"https://sports-tek.active.com/tmonline/aTeamResults.asp?Sex={sex}&Stroke={strokenum}&Distance={distance}&Course=S&Fastest=1&TEAM=0&CODE=BCSSA%20Provincial%20Office&Low=&High=&thePage=1&PageSize=100000&STD=false&DB=upload\BCSSAProvincialOffice.mdb&Division=&Region="
+    resp3 = s.get(url)
+    
+    try:
+        resp3.raise_for_status()
+    except requests.HTTPError:
+        return
+    
+    strokeToShorthand = {"1": "FR", "2": "BK", "3": "BR", "4": "FL", "5": "IM"}
+    output_path = f"{sex}_{distance}_{strokeToShorthand[strokenum]}.html"
+    
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write(resp3.text)
+    
+    return
 
-    .no-print {
-        display: none;
-    }
-}
-""")
-
-def downloadSwimResultsPdf(url, output_path):
-    resp = requests.get(url)
-    resp.raise_for_status()
-    HTML(string=resp.text, base_url=url).write_pdf(output_path, stylesheets=[css])
 
 def createEventParameters():
     sexes = ["M", "F"]
@@ -52,27 +61,13 @@ def createEventParameters():
     
     return combos
 
-def getAllEvents(combos):
-    strokeToShorthand = {"1": "FR", "2": "BK", "3": "BR", "4": "FL", "5": "IM"}
-    urls = []
-    for c in combos:
-        urls.append((fr"https://sports-tek.active.com/tmonline/aTeamResults.asp?Sex={c[0]}&Stroke={c[1]}&Distance={c[2]}&Course=S&Fastest=1&TEAM=35&CODE=Burnaby%20Mountain%20Mantas&Low=&High=&thePage=1&PageSize=999&STD=false&DB=upload\BCSSAProvincialOffice.mdb&Division=&Region=", c))
-    
-    for link, event in urls:
-        downloadSwimResultsPdf(
-            link,
-            f"grabbed_pdfs/{event[0]}{event[2]}{strokeToShorthand[event[1]]}.pdf"
-        )
-        print(f"Finished {event[0]}{event[2]}{strokeToShorthand[event[1]]}")
-    return
-
 def ensureNeededFiles():
     """Ensures that the needed files for operations exist."""
-    if not os.path.exists(pdf_folder_name):
-        os.makedirs(pdf_folder_name)
-        print(f"Created folder: {pdf_folder_name}")
+    if not os.path.exists(html_folder_name):
+        os.makedirs(html_folder_name)
+        print(f"Created folder: {html_folder_name}")
     else:
-        print(f"Folder already exists: {pdf_folder_name}")
+        print(f"Folder already exists: {html_folder_name}")
     
     if not os.path.exists(csv_output_file_name):
         with open(csv_output_file_name, 'w', newline='') as f:
@@ -84,30 +79,33 @@ def ensureNeededFiles():
             pass
         print(f"Created file: {swimmer_info_file_name}")
 
-def readPDFFile(filename: str):
-    """Parses a PDF file with best times and returns list of lines with best times.
-
-    Args:
-        filename (str): The PDF to parse.
-
-    Returns:
-        list: A list of strings each containing each line of the times extracted.
-    """
-    reader = PdfReader(filename)
-
-    parts = ""
-    for page in reader.pages:
-        parts += page.extract_text()
+def parseHTMLFile(filename: str):
+    with open(filename, 'r', encoding='utf-8') as f:
+        html = f.read()
     
-    text_body = "".join(parts).split("\n")
-    output = []
-    for line in text_body:
-        if len(line) > 0 and line[0].isnumeric():
-            output.append(line)
-        if line[:4] == "Fema" or line[:4] == "Male":
-            output.insert(0, line)
+    html = html.encode('latin1').decode('utf-8')  # Fix Unicode glyph misbehaving
+    html.split('<tr class="trow">')[1:]  # Split along data rows and ignore first portion (headers + JS)
+    datalines = [i.replace("\n", "").replace("\t", "").strip() for i in html]
     
-    return [i.strip() for i in output]
+    pattern = re.compile(r"""
+        ^.*?>([a-zA-ZÀ-ž\-' ()\.]+?),\s*([a-zA-ZÀ-ž\-' ()\.]+?)<.*?td align=center width="\d{2}">\s*?(Div\d|Cat\d|)\s*?<.*?>(\d{2}\.\d{2}|\d{0,2}:\d{2}\.\d{2}).*?>([A-Z]{1,}[A-Z!\d ]*).*?&nbsp.*$
+    """)
+    
+    results = []
+    for line in datalines:
+        result = pattern.search(line)
+        if result:
+            results.append(list(result.groups()))
+            
+    
+    for r in results:
+        r[2] = r[2] or "Div1"
+    
+    results = [r[1] + " " + r[0], r[2], r[3], r[4] for r in results]
+    
+    eventName = "".join("".join(filename.split("_")[1:]).split(".")[0]).upper()
+    return eventName, results
+
 
 def readCSV(csvName: str):
     rows = []
@@ -121,53 +119,6 @@ def readCSV(csvName: str):
 def writeCSV(csvName: str, rows: list[Any]):
     with open(csvName, 'w', newline='') as csvfile:
         csv.writer(csvfile).writerows(rows)
-
-def extractTimes(lines: list[str]) -> tuple[str, list[list[str]]]:
-    output = []
-    nameTimePattern = re.compile(
-        r"^\s*\d+\s*([a-zA-Z\-' ()]+?),\s*([a-zA-Z\-' ()]+?)(?=\s?\d+)\s*\w+\s*(\d{0,2}:?\d{2}\.\d{2}).*$"
-    )
-    for line in lines[1:]:
-        result = nameTimePattern.search(line)
-        if result:
-            output.append(list(result.groups()))
-    
-    output = [[res[1] + " " + res[0], res[2]] for res in output]
-    
-    firstline = lines[0].strip()
-    
-    if "Female" in firstline:
-        firstline = firstline[7:-6]
-    elif "Male" in firstline:
-        firstline = firstline[5:-6]
-    else:
-        raise Exception(f"Can't determine gender classification from first line '{firstline}'")
-    
-    event = ""
-    i = len(firstline)-1
-    while i >= 0:
-        if firstline[i].isnumeric() or firstline[i] == " ":
-            break
-        event = firstline[i] + event
-        i -= 1
-    
-    distance = firstline[0:i].strip()
-    
-    eventToShorthand = {
-        "Free": "FR",
-        "Back": "BK",
-        "Fly": "FL",
-        "Breast": "BR",
-        "IM": "IM"
-    }
-    
-    shorthand = eventToShorthand.get(event)
-    
-    if shorthand:
-        print(f"Successfully deciphered event: {firstline} -> {distance+shorthand}")
-        return distance + shorthand, output
-    else:
-        raise Exception(f"Unable to decipher event: {firstline}")
 
 def getSwimmerList(filename, from_timelist=False):
     if from_timelist:
@@ -355,7 +306,7 @@ def getPDFData(pdf_folder_name: str):
         if file[-4:] != ".pdf":
             print(f"Warning: Non-PDF file found in PDF folder: {file}")
             continue
-        data.append(extractTimes(readPDFFile(f"{pdf_folder_name}/{file}")))
+        data.append(parseHTMLFile(f"{pdf_folder_name}/{file}"))
         print(f"Extracted times from {pdf_folder_name}/{file}")
     
     return data
@@ -371,7 +322,7 @@ def downloadPDFs():
 def outputDataToCSV():
     ensureNeededFiles()
     print("Decoding PDF Data...")
-    timeData = getPDFData(pdf_folder_name)  # Decode PDF data
+    timeData = getPDFData(html_folder_name)  # Decode PDF data
     
     print("Retrieving master swimmer list...")
     sList = getSwimmerList(swimmer_info_file_name)  # Retrieve swimmer list
@@ -573,7 +524,7 @@ What operation do you want to perform?
 \tQ. Exit
 """
 
-pdf_folder_name = "grabbed_pdfs"
+html_folder_name = "grabbed_htmls"
 swimmer_info_file_name = "swim_info.csv"
 csv_output_file_name = "master_times.csv"
 
